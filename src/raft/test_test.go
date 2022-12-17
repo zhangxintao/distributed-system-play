@@ -8,12 +8,15 @@ package raft
 // test with the original before submitting.
 //
 
-import "testing"
-import "fmt"
-import "time"
-import "math/rand"
-import "sync/atomic"
-import "sync"
+import (
+	"fmt"
+	"log"
+	"math/rand"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+)
 
 // The tester generously allows solutions to complete elections in one second
 // (much more than the paper's range of timeouts).
@@ -46,7 +49,7 @@ func TestInitialElection2A(t *testing.T) {
 
 	// there should still be a leader.
 	cfg.checkOneLeader()
-
+	cfg.begin("Test (2A): initial election - Done")
 	cfg.end()
 }
 
@@ -87,6 +90,7 @@ func TestReElection2A(t *testing.T) {
 	cfg.connect(leader2)
 	cfg.checkOneLeader()
 
+	cfg.begin("Test (2A): election after network failure - Done")
 	cfg.end()
 }
 
@@ -108,7 +112,6 @@ func TestManyElections2A(t *testing.T) {
 		cfg.disconnect(i1)
 		cfg.disconnect(i2)
 		cfg.disconnect(i3)
-
 		// either the current leader should still be alive,
 		// or the remaining four should elect a new one.
 		cfg.checkOneLeader()
@@ -119,7 +122,7 @@ func TestManyElections2A(t *testing.T) {
 	}
 
 	cfg.checkOneLeader()
-
+	cfg.begin("Test (2A): multiple elections - Done")
 	cfg.end()
 }
 
@@ -143,6 +146,7 @@ func TestBasicAgree2B(t *testing.T) {
 		}
 	}
 
+	cfg.begin("Test (2B): basic agreement - Done")
 	cfg.end()
 }
 
@@ -177,6 +181,8 @@ func TestRPCBytes2B(t *testing.T) {
 	if got > expected+50000 {
 		t.Fatalf("too many RPC bytes; got %v, expected %v", got, expected)
 	}
+
+	cfg.begin("Test (2B): RPC byte count - Done")
 
 	cfg.end()
 }
@@ -225,6 +231,7 @@ func For2023TestFollowerFailure2B(t *testing.T) {
 		t.Fatalf("%v committed but no majority", n)
 	}
 
+	cfg.begin("Test (2B): test progressive failure of followers - Done")
 	cfg.end()
 }
 
@@ -267,6 +274,7 @@ func For2023TestLeaderFailure2B(t *testing.T) {
 		t.Fatalf("%v committed but no majority", n)
 	}
 
+	cfg.begin("Test (2B): test failure of leaders - Done")
 	cfg.end()
 }
 
@@ -305,6 +313,7 @@ func TestFailAgree2B(t *testing.T) {
 	time.Sleep(RaftElectionTimeout)
 	cfg.one(107, servers, true)
 
+	cfg.begin("Test (2B): agreement after follower reconnects - Done")
 	cfg.end()
 }
 
@@ -356,6 +365,7 @@ func TestFailNoAgree2B(t *testing.T) {
 
 	cfg.one(1000, servers, true)
 
+	cfg.begin("Test (2B): no agreement if too many followers disconnect - Done")
 	cfg.end()
 }
 
@@ -457,6 +467,7 @@ loop:
 		t.Fatalf("term changed too often")
 	}
 
+	cfg.begin("Test (2B): concurrent Start()s - Done")
 	cfg.end()
 }
 
@@ -495,6 +506,7 @@ func TestRejoin2B(t *testing.T) {
 
 	cfg.one(105, servers, true)
 
+	cfg.begin("Test (2B): rejoin of partitioned leader - Done")
 	cfg.end()
 }
 
@@ -508,12 +520,14 @@ func TestBackup2B(t *testing.T) {
 	cfg.one(rand.Int(), servers, true)
 
 	// put leader and one follower in a partition
+	log.Printf("put leader and one follower in a partition\n")
 	leader1 := cfg.checkOneLeader()
 	cfg.disconnect((leader1 + 2) % servers)
 	cfg.disconnect((leader1 + 3) % servers)
 	cfg.disconnect((leader1 + 4) % servers)
 
 	// submit lots of commands that won't commit
+	log.Printf("submit lots of commands that won't commit\n")
 	for i := 0; i < 50; i++ {
 		cfg.rafts[leader1].Start(rand.Int())
 	}
@@ -529,11 +543,13 @@ func TestBackup2B(t *testing.T) {
 	cfg.connect((leader1 + 4) % servers)
 
 	// lots of successful commands to new group.
+	log.Printf("lots of successful commands to new group\n")
 	for i := 0; i < 50; i++ {
 		cfg.one(rand.Int(), 3, true)
 	}
 
 	// now another partitioned leader and one follower
+	log.Printf("now another partitioned leader and one follower\n")
 	leader2 := cfg.checkOneLeader()
 	other := (leader1 + 2) % servers
 	if leader2 == other {
@@ -542,6 +558,7 @@ func TestBackup2B(t *testing.T) {
 	cfg.disconnect(other)
 
 	// lots more commands that won't commit
+	log.Printf("lots more commands that won't commit\n")
 	for i := 0; i < 50; i++ {
 		cfg.rafts[leader2].Start(rand.Int())
 	}
@@ -549,6 +566,7 @@ func TestBackup2B(t *testing.T) {
 	time.Sleep(RaftElectionTimeout / 2)
 
 	// bring original leader back to life,
+	log.Printf("bring original leader back to life\n")
 	for i := 0; i < servers; i++ {
 		cfg.disconnect(i)
 	}
@@ -557,16 +575,19 @@ func TestBackup2B(t *testing.T) {
 	cfg.connect(other)
 
 	// lots of successful commands to new group.
+	log.Printf("lots of successful commands to new group\n")
 	for i := 0; i < 50; i++ {
 		cfg.one(rand.Int(), 3, true)
 	}
 
 	// now everyone
+	log.Printf("lnow everyone\n")
 	for i := 0; i < servers; i++ {
 		cfg.connect(i)
 	}
 	cfg.one(rand.Int(), servers, true)
 
+	cfg.begin("Test (2B): leader backs up quickly over incorrect follower logs - Done")
 	cfg.end()
 }
 
@@ -677,6 +698,7 @@ loop:
 		t.Fatalf("too many RPCs (%v) for 1 second of idleness\n", total3-total2)
 	}
 
+	cfg.begin("Test (2B): RPC counts aren't too high  - Done")
 	cfg.end()
 }
 
@@ -908,28 +930,34 @@ func TestFigure8Unreliable2C(t *testing.T) {
 
 	nup := servers
 	for iters := 0; iters < 1000; iters++ {
+		log.Printf("start iter: %v", iters)
 		if iters == 200 {
 			cfg.setlongreordering(true)
+			log.Printf("setlongreordering")
 		}
 		leader := -1
 		for i := 0; i < servers; i++ {
 			_, _, ok := cfg.rafts[i].Start(rand.Int() % 10000)
 			if ok && cfg.connected[i] {
 				leader = i
+				log.Printf("iter:%v, leader:%v", iters, leader)
 			}
 		}
 
 		if (rand.Int() % 1000) < 100 {
 			ms := rand.Int63() % (int64(RaftElectionTimeout/time.Millisecond) / 2)
+			log.Printf("iter:%v, sleep:%v", iters, ms)
 			time.Sleep(time.Duration(ms) * time.Millisecond)
 		} else {
 			ms := (rand.Int63() % 13)
 			time.Sleep(time.Duration(ms) * time.Millisecond)
+			log.Printf("iter:%v, sleep:%v", iters, ms)
 		}
 
 		if leader != -1 && (rand.Int()%1000) < int(RaftElectionTimeout/time.Millisecond)/2 {
 			cfg.disconnect(leader)
 			nup -= 1
+			log.Printf("iter:%v, disconnect:%v", iters, leader)
 		}
 
 		if nup < 3 {
@@ -937,8 +965,11 @@ func TestFigure8Unreliable2C(t *testing.T) {
 			if cfg.connected[s] == false {
 				cfg.connect(s)
 				nup += 1
+				log.Printf("iter:%v, re-connect:%v", iters, s)
 			}
 		}
+
+		log.Printf("finish iter: %v", iters)
 	}
 
 	for i := 0; i < servers; i++ {
@@ -946,9 +977,10 @@ func TestFigure8Unreliable2C(t *testing.T) {
 			cfg.connect(i)
 		}
 	}
+	log.Printf("done iter and recover")
 
 	cfg.one(rand.Int()%10000, servers, true)
-
+	cfg.begin("Done - Test (2C): Figure 8 (unreliable)")
 	cfg.end()
 }
 
